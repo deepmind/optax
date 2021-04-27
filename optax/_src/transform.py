@@ -272,6 +272,33 @@ def scale(
   return base.GradientTransformation(init_fn, update_fn)
 
 
+ScaleByParamNormState = base.EmptyState
+
+
+def scale_by_param_norm(
+    min_scale: float = 1e-3
+) -> base.GradientTransformation:
+  """Scale updates for each layer by the norm of that layer's parameters.
+
+  Args:
+    min_scale: minimum scaling factor.
+
+  Returns:
+    An (init_fn, update_fn) tuple.
+  """
+
+  def init_fn(_):
+    return ScaleByParamNormState()
+
+  def update_fn(updates, state, params):
+    updates = jax.tree_multimap(
+        lambda u, p: u * jnp.maximum(jnp.sqrt(jnp.mean(p * p)), min_scale),
+        updates, params)
+    return updates, state
+
+  return base.GradientTransformation(init_fn, update_fn)
+
+
 class ScaleByBeliefState(base.OptState):
   """State for the rescaling by AdaBelief algorithm."""
   count: jnp.ndarray  # shape=(), dtype=jnp.int32.
@@ -450,11 +477,6 @@ def add_decayed_weights(
     return updates, state
 
   return base.GradientTransformation(init_fn, update_fn)
-
-
-# TODO(b/180608630): Remove deprecated references.
-AdditiveWeightDecayState = AddDecayedWeightsState
-additive_weight_decay = add_decayed_weights
 
 
 class ScaleByScheduleState(base.OptState):
@@ -664,18 +686,8 @@ def centralize() -> base.GradientTransformation:
 # TODO(b/183800387): remove legacy aliases.
 # These legacy aliases are here for checkpoint compatibility
 # To be removed once checkpoints have updated.
-
-# clip = clipping.clip
+AdditiveWeightDecayState = AddDecayedWeightsState
+additive_weight_decay = add_decayed_weights
 ClipState = clipping.ClipState
-# clip_by_global_norm = clipping.clip_by_global_norm
 ClipByGlobalNormState = clipping.ClipByGlobalNormState
-# global_norm = utils.global_norm
-# identity = base.identity
 IdentityState = base.EmptyState
-# keep_params_nonnegative = constrain.keep_params_nonnegative
-# NonNegativeParamsState = constrain.NonNegativeParamsState
-# OptState = base.OptState
-# Params = base.Params
-# Updates = base.Updates
-# zero_nans = constrain.zero_nans
-# ZeroNansState = constrain.ZeroNansState
