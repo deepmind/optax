@@ -800,4 +800,3 @@ _safe_int32_increment = numerics.safe_int32_increment
 safe_int32_increment = numerics.safe_int32_increment
 ClipState = clipping.ClipState
 ClipByGlobalNormState = clipping.ClipByGlobalNormState
-IdentityState = base.EmptyState
