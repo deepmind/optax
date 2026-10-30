@@ -94,7 +94,7 @@ def reduce_on_plateau(
     raise ValueError(
         f"rtol must be less than or equal to 1.0, got rtol = {rtol}."
     )
-  if patience < 0:
+  if patience < 0:  # pyrefly: ignore[unsupported-operation]
     raise ValueError(
         f"patience must be non-negative, got patience = {patience}."
     )
