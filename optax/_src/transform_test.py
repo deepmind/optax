@@ -260,7 +260,7 @@ class TransformTest(parameterized.TestCase):
     step = jax.jit(solver.update) if use_jit else solver.update
     for sign in (1.0, 1.0, -1.0, -1.0, 0.0, -1.0, -1.0):
       slope = jnp.array([sign, -sign], dtype=dtype)
-      grad_fn = jax.grad(lambda p, s: jnp.vdot(p, s))
+      grad_fn = jax.grad(jnp.vdot)
       grads = grad_fn(params, slope)
       scaled_grads = grad_fn(scaled_params, slope * loss_scale)
       # Only the product of the normal inputs with a step can underflow.
