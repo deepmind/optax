@@ -40,10 +40,10 @@ class ReduceLROnPlateauState(NamedTuple):
 
 
 def reduce_on_plateau(
-    factor: jax.typing.ArrayLike = 0.1,
+    factor: float | jax.Array = 0.1,
     patience: jax.typing.ArrayLike = 10,
-    rtol: jax.typing.ArrayLike = 1e-4,
-    atol: jax.typing.ArrayLike = 0.0,
+    rtol: float | jax.Array = 1e-4,
+    atol: float | jax.Array = 0.0,
     cooldown: jax.typing.ArrayLike = 0,
     accumulation_size: jax.typing.ArrayLike = 1,
     min_scale: jax.typing.ArrayLike = 0.0,
