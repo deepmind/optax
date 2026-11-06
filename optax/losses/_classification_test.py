@@ -1172,6 +1172,32 @@ class CTCTest(parameterized.TestCase):
 
 class SigmoidFocalLossTest(parameterized.TestCase):
 
+  @parameterized.product(use_jit=(False, True), gamma=(0.5, 2.0))
+  def test_gradient_matches_analytical_focal_weight(self, use_jit, gamma):
+    logits = jnp.array([-3.0, -0.4, 0.7, 2.5])
+    labels = jnp.array([0.0, 1.0, 0.0, 1.0])
+    alpha = 0.3
+    scores, truth = np.asarray(logits), np.asarray(labels)
+    sign = 2 * truth - 1
+    probabilities = 1 / (1 + np.exp(-scores))
+    target_probabilities = 1 / (1 + np.exp(-sign * scores))
+    cross_entropy = np.logaddexp(0, -sign * scores)
+    weights = np.where(truth == 1, alpha, 1 - alpha)
+    expected = weights * (1 - target_probabilities)**gamma * (
+        probabilities - truth
+        - gamma * sign * target_probabilities * cross_entropy
+    )
+
+    def objective(values):
+      return _classification.sigmoid_focal_loss(
+          values, labels, alpha=alpha, gamma=gamma
+      ).sum()
+
+    gradient = jax.grad(objective)
+    if use_jit:
+      gradient = jax.jit(gradient)
+    np.testing.assert_allclose(gradient(logits), expected, atol=2e-6)
+
   def setUp(self):
     super().setUp()
     self.ys = np.array([[2.0, 0.1, -2.0], [0.3, -0.1, 1.2]], dtype=np.float32)
