@@ -878,6 +878,24 @@ class KLDivergenceTest(parameterized.TestCase):
 
 class KLDivergenceWithLogTargetsTest(parameterized.TestCase):
 
+  @parameterized.parameters(False, True)
+  def test_gradients_in_both_log_probability_arguments(self, use_jit):
+    log_predictions = jnp.array([-0.8, -1.4, -2.0])
+    log_targets = jnp.array([-1.6, -1.2, -0.7])
+    gradient = jax.grad(
+        _classification.kl_divergence_with_log_targets, argnums=(0, 1)
+    )
+    if use_jit:
+      gradient = jax.jit(gradient)
+    predicted_gradient, target_gradient = gradient(log_predictions, log_targets)
+    probabilities = np.exp(np.asarray(log_targets))
+    np.testing.assert_allclose(predicted_gradient, -probabilities, atol=2e-6)
+    np.testing.assert_allclose(
+        target_gradient,
+        probabilities * (np.asarray(log_targets - log_predictions) + 1),
+        atol=2e-6,
+    )
+
   def setUp(self):
     super().setUp()
     self.log_ps = np.array([
