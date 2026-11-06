@@ -588,6 +588,23 @@ class HingeTest(parameterized.TestCase):
 
 class SparsemaxTest(parameterized.TestCase):
 
+  @parameterized.parameters(False, True)
+  def test_binary_gradient_and_curvature_across_support(self, use_jit):
+    logits = jnp.array([-2.0, -0.4, 0.3, 2.0])
+    labels = jnp.array([0, 1, 0, 1])
+
+    def objective(values):
+      return _classification.sparsemax_loss(values, labels).sum()
+
+    gradient = jax.grad(objective)
+    hessian = jax.hessian(objective)
+    if use_jit:
+      gradient, hessian = jax.jit(gradient), jax.jit(hessian)
+    np.testing.assert_allclose(gradient(logits), [0, -0.7, 0.65, 0], atol=2e-6)
+    np.testing.assert_allclose(
+        hessian(logits), np.diag([0, 0.5, 0.5, 0]), atol=2e-6
+    )
+
   def test_binary(self):
     label = 1
     score = 10.0
