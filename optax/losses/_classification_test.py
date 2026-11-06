@@ -509,6 +509,22 @@ class PolyLossTest(parameterized.TestCase):
 class HingeTest(parameterized.TestCase):
 
   @parameterized.parameters(False, True)
+  def test_multiclass_gradient_selects_violating_competitor(self, use_jit):
+    scores = jnp.array([[0.2, 1.7, -0.5], [3.0, 0.3, -1.0],
+                        [-2.0, 1.2, 0.5]])
+    labels = jnp.array([0, 0, 2])
+
+    def objective(values):
+      return _classification.multiclass_hinge_loss(values, labels).sum()
+
+    gradient = jax.grad(objective)
+    if use_jit:
+      gradient = jax.jit(gradient)
+    np.testing.assert_array_equal(
+        gradient(scores), [[-1, 1, 0], [0, 0, 0], [0, 1, -1]]
+    )
+
+  @parameterized.parameters(False, True)
   def test_binary_gradient_on_both_sides_of_margin(self, use_jit):
     scores = jnp.array([-2.0, -2.0, 0.25, 2.0, 2.0])
     targets = jnp.array([1.0, -1.0, 1.0, 1.0, -1.0])
