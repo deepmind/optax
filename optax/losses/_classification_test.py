@@ -810,6 +810,21 @@ class PerceptronTest(parameterized.TestCase):
 
 class KLDivergenceTest(parameterized.TestCase):
 
+  @parameterized.parameters(False, True)
+  def test_gradients_in_log_prediction_and_target_coordinates(self, use_jit):
+    log_predictions = jnp.array([-0.8, -1.4, -2.0])
+    targets = jnp.array([0.2, 0.3, 0.5])
+    gradient = jax.grad(_classification.kl_divergence, argnums=(0, 1))
+    if use_jit:
+      gradient = jax.jit(gradient)
+    predicted_gradient, target_gradient = gradient(log_predictions, targets)
+    np.testing.assert_allclose(predicted_gradient, -np.asarray(targets))
+    np.testing.assert_allclose(
+        target_gradient,
+        np.log(np.asarray(targets)) - np.asarray(log_predictions) + 1,
+        atol=2e-6,
+    )
+
   def setUp(self):
     super().setUp()
     self.log_ps = np.array([
