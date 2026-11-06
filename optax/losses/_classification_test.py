@@ -508,6 +508,17 @@ class PolyLossTest(parameterized.TestCase):
 
 class HingeTest(parameterized.TestCase):
 
+  @parameterized.parameters(False, True)
+  def test_binary_gradient_on_both_sides_of_margin(self, use_jit):
+    scores = jnp.array([-2.0, -2.0, 0.25, 2.0, 2.0])
+    targets = jnp.array([1.0, -1.0, 1.0, 1.0, -1.0])
+    gradient = jax.grad(
+        lambda values: _classification.hinge_loss(values, targets).sum()
+    )
+    if use_jit:
+      gradient = jax.jit(gradient)
+    np.testing.assert_array_equal(gradient(scores), [-1, 0, -1, 0, 1])
+
   def test_binary(self):
     label = jnp.array(1)
     signed_label = jnp.array(2.0 * label - 1.0)
