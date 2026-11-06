@@ -667,6 +667,28 @@ class SparsemaxTest(parameterized.TestCase):
 
 class GeneralizedKLDivergenceTest(parameterized.TestCase):
 
+  @parameterized.parameters(False, True)
+  def test_unnormalized_gradient_and_curvature(self, use_jit):
+    log_predictions = jnp.array([-0.8, 0.4, 1.2])
+    targets = jnp.array([0.2, 1.3, 2.5])
+
+    def objective(values):
+      return _classification.generalized_kl_divergence(values, targets)
+
+    gradient = jax.grad(objective)
+    hessian = jax.hessian(objective)
+    if use_jit:
+      gradient, hessian = jax.jit(gradient), jax.jit(hessian)
+    probabilities = np.exp(np.asarray(log_predictions))
+    np.testing.assert_allclose(
+        gradient(log_predictions),
+        probabilities - np.asarray(targets),
+        atol=2e-6,
+    )
+    np.testing.assert_allclose(
+        hessian(log_predictions), np.diag(probabilities), atol=2e-6
+    )
+
   def setUp(self):
     super().setUp()
     self.log_ps = np.array([
