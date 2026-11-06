@@ -102,6 +102,33 @@ class SoftmaxCrossEntropyTest(parameterized.TestCase):
 
 class SafeSoftmaxCrossEntropyTest(parameterized.TestCase):
 
+  @parameterized.parameters(False, True)
+  def test_weighted_logsoftmax_joint_directional_derivative(self, use_jit):
+    logits = jnp.array([0.3, -0.7, 1.2])
+    weights = jnp.array([0.0, 2.0, -1.0])
+    logit_direction = jnp.array([0.4, -0.2, 0.7])
+    weight_direction = jnp.array([0.1, -0.5, 0.3])
+    probabilities = np.exp(np.asarray(logits))
+    probabilities /= probabilities.sum()
+    log_probabilities = np.log(probabilities)
+    expected = np.asarray(weights) * (
+        np.asarray(logit_direction)
+        - np.dot(probabilities, np.asarray(logit_direction))
+    ) + np.asarray(weight_direction) * log_probabilities
+
+    def directional(values, coefficients):
+      return jax.jvp(
+          _classification.weighted_logsoftmax,
+          (values, coefficients),
+          (logit_direction, weight_direction),
+      )[1]
+
+    if use_jit:
+      directional = jax.jit(directional)
+    np.testing.assert_allclose(
+        directional(logits, weights), expected, atol=2e-6
+    )
+
   def setUp(self):
     super().setUp()
     self.ys = np.array(
