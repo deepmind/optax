@@ -716,6 +716,22 @@ class GeneralizedKLDivergenceTest(parameterized.TestCase):
 class PerceptronTest(parameterized.TestCase):
 
   @parameterized.parameters(False, True)
+  def test_multiclass_gradient_matches_perceptron_update(self, use_jit):
+    scores = jnp.array([[0.2, 1.7, -0.5], [3.0, 0.3, -1.0],
+                        [-2.0, 1.2, 0.5]])
+    labels = jnp.array([0, 0, 2])
+
+    def objective(values):
+      return _classification.multiclass_perceptron_loss(values, labels).sum()
+
+    gradient = jax.grad(objective)
+    if use_jit:
+      gradient = jax.jit(gradient)
+    np.testing.assert_array_equal(
+        gradient(scores), [[-1, 1, 0], [0, 0, 0], [0, 1, -1]]
+    )
+
+  @parameterized.parameters(False, True)
   def test_binary_gradient_updates_only_misclassified_scores(self, use_jit):
     scores = jnp.array([-2.0, 2.0, -0.25, 0.25])
     targets = jnp.array([1.0, 1.0, -1.0, -1.0])
