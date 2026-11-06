@@ -292,6 +292,28 @@ class SoftmaxCrossEntropyWithIntegerLabelsTest(parameterized.TestCase):
 
 class SigmoidCrossEntropyTest(parameterized.TestCase):
 
+  @parameterized.parameters(False, True)
+  def test_soft_label_gradient_and_curvature(self, use_jit):
+    logits = jnp.array([-8.0, -1.5, 0.25, 3.0, 8.0])
+    labels = jnp.array([0.1, 0.8, 0.4, 0.2, 0.9])
+    probabilities = 1 / (1 + np.exp(-np.asarray(logits)))
+
+    def objective(values):
+      return _classification.sigmoid_binary_cross_entropy(values, labels).sum()
+
+    gradient = jax.grad(objective)
+    hessian = jax.hessian(objective)
+    if use_jit:
+      gradient, hessian = jax.jit(gradient), jax.jit(hessian)
+    np.testing.assert_allclose(
+        gradient(logits), probabilities - np.asarray(labels), atol=2e-6
+    )
+    np.testing.assert_allclose(
+        hessian(logits),
+        np.diag(probabilities * (1 - probabilities)),
+        atol=2e-6,
+    )
+
   @parameterized.parameters(
       {
           'preds': np.array([-1e09, -1e-09]),
