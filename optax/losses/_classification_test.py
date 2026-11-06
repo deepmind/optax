@@ -375,6 +375,32 @@ class SigmoidCrossEntropyTest(parameterized.TestCase):
 
 class PolyLossTest(parameterized.TestCase):
 
+  @parameterized.product(use_jit=(False, True), epsilon=(-0.5, 3.0))
+  def test_soft_label_gradient_identity(self, use_jit, epsilon):
+    logits = jnp.array([[0.3, -0.7, 1.2], [1.5, 0.2, -0.4]])
+    labels = jnp.array([[0.2, 0.5, 0.3], [0.6, 0.1, 0.3]])
+    probabilities = np.exp(np.asarray(logits))
+    probabilities /= probabilities.sum(axis=-1, keepdims=True)
+    target_probability = (probabilities * np.asarray(labels)).sum(
+        axis=-1, keepdims=True
+    )
+    expected = probabilities - np.asarray(labels)
+    expected -= epsilon * probabilities * (
+        np.asarray(labels) - target_probability
+    )
+
+    def objective(values):
+      return _classification.poly_loss_cross_entropy(
+          values, labels, epsilon=epsilon
+      ).sum()
+
+    gradient = jax.grad(objective)
+    if use_jit:
+      gradient = jax.jit(gradient)
+    actual = gradient(logits)
+    np.testing.assert_allclose(actual, expected, atol=2e-6)
+    np.testing.assert_allclose(actual.sum(axis=-1), 0, atol=2e-6)
+
   def setUp(self):
     super().setUp()
     self.logits = np.array([0.14, 1.456, 2.356, -0.124, -2.47])
