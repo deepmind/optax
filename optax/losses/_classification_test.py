@@ -995,6 +995,80 @@ class CTCTest(parameterized.TestCase):
     self.assertTrue(jnp.all(loss_direct >= 0.0))
     np.testing.assert_allclose(loss_direct, 0.0, atol=1e-6)
 
+  def test_unused_class_with_infinite_logit(self):
+    # A `-inf` logit gives a class zero probability. If that class never
+    # appears in `labels`, it must not contribute `0 * -inf = nan` to the
+    # emitted-label log-probabilities and hence to the loss.
+    logits = jnp.array([[[0.0, 1.0, 0.0, -jnp.inf],
+                         [0.0, 1.0, 0.0, -jnp.inf]]], dtype=jnp.float32)
+    labels = jnp.array([[1]], dtype=jnp.int32)
+    logit_paddings = jnp.zeros((1, 2))
+    label_paddings = jnp.zeros((1, 1))
+
+    loss, logalpha_phi, logalpha_emit = jax.jit(
+        _classification.ctc_loss_with_forward_probs,
+        static_argnames=('blank_id',),
+    )(
+        logits=logits,
+        logit_paddings=logit_paddings,
+        labels=labels,
+        label_paddings=label_paddings,
+        blank_id=0,
+    )
+    self.assertTrue(jnp.all(jnp.isfinite(loss)))
+    self.assertTrue(jnp.all(jnp.isfinite(logalpha_phi)))
+    self.assertTrue(jnp.all(jnp.isfinite(logalpha_emit)))
+
+    # The zero-probability class cannot change the result, so the loss must
+    # match the one obtained by dropping it altogether.
+    expected = jax.jit(
+        _classification.ctc_loss,
+        static_argnames=('blank_id',),
+    )(
+        logits=logits[..., :3],
+        logit_paddings=logit_paddings,
+        labels=labels,
+        label_paddings=label_paddings,
+        blank_id=0,
+    )
+    np.testing.assert_allclose(loss, expected, rtol=self._rtol)
+
+    loss_direct = jax.jit(
+        _classification.ctc_loss,
+        static_argnames=('blank_id',),
+    )(
+        logits=logits,
+        logit_paddings=logit_paddings,
+        labels=labels,
+        label_paddings=label_paddings,
+        blank_id=0,
+    )
+    np.testing.assert_allclose(loss_direct, expected, rtol=self._rtol)
+
+  def test_out_of_range_padding_labels_stay_finite(self):
+    # Padded label slots are ignored, but they used to be mapped to a zero
+    # one-hot row. Gathering must keep those slots finite as well.
+    logits = np.random.randn(2, 3, 5)
+    logit_paddings = jnp.zeros((2, 3))
+    label_paddings = jnp.array([[0.0, 1.0, 1.0], [0.0, 1.0, 1.0]])
+    scores = []
+    for filler in (0, 7, -3):
+      labels = jnp.array([[1, filler, filler], [2, filler, filler]])
+      loss = jax.jit(
+          _classification.ctc_loss,
+          static_argnames=('blank_id',),
+      )(
+          logits=logits,
+          logit_paddings=logit_paddings,
+          labels=labels,
+          label_paddings=label_paddings,
+          blank_id=0,
+      )
+      self.assertTrue(jnp.all(jnp.isfinite(loss)))
+      scores.append(np.asarray(loss))
+    np.testing.assert_allclose(scores[0], scores[1], rtol=self._rtol)
+    np.testing.assert_allclose(scores[0], scores[2], rtol=self._rtol)
+
 
 class SigmoidFocalLossTest(parameterized.TestCase):
 
