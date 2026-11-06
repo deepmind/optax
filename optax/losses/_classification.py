@@ -775,7 +775,9 @@ def ctc_loss_with_forward_probs(
   # Gather instead of multiplying by one-hot labels: an unrelated class with
   # log-probability -inf would otherwise contribute 0 * -inf = NaN.
   # Preserve the zero contribution of out-of-range labels used for padding.
-  label_indices = jnp.where(jnp.asarray(labels) < 0, num_classes, labels)
+  label_indices = jnp.where(
+      jnp.asarray(labels) < 0, jnp.int32(num_classes), labels
+  )
   logprobs_emit = jnp.take_along_axis(
       logprobs, label_indices[:, None, :], axis=-1, fill_value=0.0
   )  # [B, T, N]

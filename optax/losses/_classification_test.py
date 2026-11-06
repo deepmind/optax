@@ -933,6 +933,34 @@ class CTCTest(parameterized.TestCase):
     )
     np.testing.assert_array_equal(actual_grad[..., 3], 0.0)
 
+  @parameterized.product(
+      label_dtype=(jnp.int8, jnp.int16),
+      use_jit=(False, True),
+      at_boundary=(False, True),
+  )
+  def test_narrow_padding_label_indices(
+      self, label_dtype, use_jit, at_boundary
+  ):
+    # The out-of-bounds gather sentinel must not wrap to a valid class when
+    # the vocabulary size exceeds the label dtype's positive range.
+    num_classes = np.iinfo(label_dtype).max + int(at_boundary)
+    logits = jnp.zeros((1, 2, num_classes))
+    labels = jnp.array([[1, -1]], dtype=label_dtype)
+
+    def forward(x, y):
+      return _classification.ctc_loss_with_forward_probs(
+          x, jnp.zeros((1, 2)), y, jnp.array([[0.0, 1.0]])
+      )
+
+    if use_jit:
+      forward = jax.jit(forward)
+    expected = forward(logits, labels.astype(jnp.int32))
+    actual = forward(logits, labels)
+    # Check the exposed forward states too: padded target states do not
+    # necessarily affect the final loss, but must retain the same values.
+    for actual_array, expected_array in zip(actual, expected):
+      np.testing.assert_allclose(actual_array, expected_array, rtol=self._rtol)
+
   @parameterized.parameters(False, True)
   def test_all_masked_padded_frames(self, use_jit):
     logits = jnp.array([[[0.3, -0.2], [-0.1, 0.5]]])
